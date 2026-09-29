@@ -17,7 +17,7 @@ CareCompass turns every patient conversation into measurable quality improvement
                         ▼                                ▼                                ▼
                ┌─────────────────┐             ┌─────────────────┐             ┌─────────────────┐
                │  Plaud API      │             │ Interhuman AI   │             │ Crusoe Inference│
-               │ (Transcription) │             │ (Engagement)    │             │ (Coaching)      │
+               │ (Transcription) │             │ (Social Signals)    │             │ (Coaching)      │
                └─────────────────┘             └─────────────────┘             └─────────────────┘
 ```
 
@@ -138,6 +138,41 @@ open PlaudTemplateApp.xcodeproj
 3. **Coaching Generation** (Crusoe):
    - LLM analyzes transcript + engagement data
    - Generates 2-3 specific, actionable coaching insights
+
+## Market Research
+
+See [`research/MARKET_RESEARCH.md`](research/MARKET_RESEARCH.md) for competitive analysis using Similarweb data.
+
+## Next Steps & Testing
+
+### UserTesting Integration (Recommended)
+
+Before major releases, validate the user experience with real healthcare professionals:
+
+1. **Create a UserTesting study** at [usertesting.com](https://www.usertesting.com)
+2. **Target audience**: Healthcare providers (physicians, nurses, medical assistants)
+3. **Key tasks to test**:
+   - Device pairing flow
+   - Recording sync experience
+   - Coaching insights comprehension
+   - Actionability of recommendations
+
+**Automated Testing Pipeline** (Future):
+```yaml
+# Example CI integration
+on:
+  release:
+    types: [created]
+jobs:
+  usertesting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger UserTesting Study
+        run: |
+          curl -X POST https://api.usertesting.com/v1/studies \
+            -H "Authorization: Bearer ${{ secrets.USERTESTING_API_KEY }}" \
+            -d '{"template_id": "healthcare-provider-test"}'
+```
 
 ## License
 
