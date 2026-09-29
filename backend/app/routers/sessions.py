@@ -171,6 +171,9 @@ async def run_analysis_pipeline(session_id: str):
         try:
             transcript = await plaud_client.transcribe_audio(session.audio_path)
             session.transcript = transcript
+            print(f"[Pipeline] Transcript received: {len(transcript)} segments")
+            if transcript:
+                print(f"[Pipeline] First segment: {transcript[0].text[:100] if transcript[0].text else 'empty'}...")
         except Exception as e:
             print(f"Plaud transcription failed: {e}")
             # Continue without transcript - Interhuman can still analyze

@@ -75,6 +75,9 @@ class CrusoeClient:
         engagement_text = self._format_engagement(engagement_windows)
         quality_text = self._format_quality(conversation_quality)
         
+        print(f"[Crusoe] Generating coaching with {len(transcript)} transcript segments")
+        print(f"[Crusoe] Transcript preview: {transcript_text[:500] if transcript_text else 'EMPTY'}...")
+        
         user_prompt = f"""## Transcript
 {transcript_text}
 
