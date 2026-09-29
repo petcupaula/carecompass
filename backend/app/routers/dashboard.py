@@ -10,6 +10,7 @@ from collections import defaultdict
 from fastapi import APIRouter
 
 from ..models import ProviderMetrics, AnalysisStatus
+from ..services import get_neo4j_client
 from .sessions import sessions
 
 
@@ -90,3 +91,49 @@ async def get_all_provider_metrics() -> List[ProviderMetrics]:
     metrics.sort(key=lambda m: m.total_sessions, reverse=True)
     
     return metrics
+
+
+# Neo4j Knowledge Graph Endpoints
+
+@router.get("/graph/trends/{provider_id}")
+async def get_provider_trends(provider_id: str):
+    """
+    Get quality score trends from Neo4j knowledge graph.
+    
+    Shows how a provider's scores have changed over time.
+    """
+    neo4j = get_neo4j_client()
+    if not neo4j.is_configured:
+        return {"error": "Neo4j not configured", "configured": False}
+    
+    return await neo4j.get_provider_trends(provider_id)
+
+
+@router.get("/graph/themes/{provider_id}")
+async def get_coaching_themes(provider_id: str):
+    """
+    Get recurring coaching themes from Neo4j knowledge graph.
+    
+    Identifies patterns in coaching recommendations across sessions.
+    """
+    neo4j = get_neo4j_client()
+    if not neo4j.is_configured:
+        return {"error": "Neo4j not configured", "configured": False}
+    
+    themes = await neo4j.get_common_coaching_themes(provider_id)
+    return {"provider_id": provider_id, "themes": themes}
+
+
+@router.get("/graph/signals/{provider_id}")
+async def get_signal_patterns(provider_id: str):
+    """
+    Get social signal patterns from Neo4j knowledge graph.
+    
+    Shows which signals appear most frequently in conversations.
+    """
+    neo4j = get_neo4j_client()
+    if not neo4j.is_configured:
+        return {"error": "Neo4j not configured", "configured": False}
+    
+    signals = await neo4j.get_signal_patterns(provider_id)
+    return {"provider_id": provider_id, "signals": signals}

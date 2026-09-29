@@ -43,10 +43,11 @@ CareCompass turns every patient conversation into measurable quality improvement
 
 ### Backend API (`backend/`)
 - FastAPI server orchestrating the analysis pipeline
-- Integrates three services:
+- Integrates four services:
   - **Plaud Transcription API**: Speech-to-text with speaker diarization
   - **Interhuman AI API**: Engagement analysis and conversation quality
   - **Crusoe Inference API**: LLM-powered coaching generation
+  - **Neo4j Knowledge Graph**: Track provider improvement over time
 
 ## Quick Start
 
@@ -68,6 +69,10 @@ CareCompass turns every patient conversation into measurable quality improvement
 
 **Crusoe** (from [console.crusoecloud.com](https://console.crusoecloud.com)):
 - Inference API Key
+
+**Neo4j** (optional, from [console.neo4j.io](https://console.neo4j.io)):
+- AuraDB Free instance URI, username, and password
+- Used to track provider improvement over time
 
 ### 2. Configure Backend
 
@@ -150,6 +155,25 @@ open PlaudTemplateApp.xcodeproj
 3. **Coaching Generation** (Crusoe):
    - LLM analyzes transcript + engagement data
    - Generates 2-3 specific, actionable coaching insights
+4. **Knowledge Graph** (Neo4j, optional):
+   - Store sessions, quality scores, and coaching insights
+   - Track provider improvement trends over time
+   - Identify recurring coaching themes
+
+## Neo4j Knowledge Graph
+
+When configured, CareCompass stores analysis results in a Neo4j graph:
+
+```
+(:Provider)-[:CONDUCTED]->(:Session)-[:HAS_QUALITY]->(:QualityScore)
+                                    -[:GENERATED]->(:CoachingInsight)
+                                    -[:HAS_SIGNAL]->(:SocialSignal)
+```
+
+### Graph API Endpoints
+- `GET /dashboard/graph/trends/{provider_id}` - Quality score trends over time
+- `GET /dashboard/graph/themes/{provider_id}` - Recurring coaching themes
+- `GET /dashboard/graph/signals/{provider_id}` - Social signal patterns
 
 ## Market Research
 

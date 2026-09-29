@@ -25,6 +25,7 @@ from ..services import (
     get_interhuman_client,
     get_plaud_client,
     get_crusoe_client,
+    get_neo4j_client,
 )
 
 
@@ -195,6 +196,11 @@ async def run_analysis_pipeline(session_id: str):
         session.coaching_insights = insights
         
         session.status = AnalysisStatus.COMPLETED
+        
+        # Step 4: Store in Neo4j knowledge graph (if configured)
+        neo4j_client = get_neo4j_client()
+        if neo4j_client.is_configured:
+            await neo4j_client.store_session(session)
         
     except Exception as e:
         session.status = AnalysisStatus.FAILED
