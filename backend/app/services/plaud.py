@@ -41,23 +41,29 @@ class PlaudClient:
         
         print("[Plaud] Getting partner token...")
         partner_resp = await client.post(
-            f"{self.base_url}/open/partner/token",
-            headers={"Authorization": f"Basic {basic_auth}"},
+            f"{self.base_url}/oauth/partner/access-token",
+            headers={
+                "Authorization": f"Basic {basic_auth}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
         )
         partner_resp.raise_for_status()
         partner_data = partner_resp.json()
-        partner_token = partner_data["data"]["access_token"]
+        partner_token = partner_data["access_token"]
         
         # Step 2: Mint user access token
         print("[Plaud] Minting user access token...")
         user_resp = await client.post(
             f"{self.base_url}/open/partner/users/access-token",
-            headers={"Authorization": f"Bearer {partner_token}"},
+            headers={
+                "Authorization": f"Bearer {partner_token}",
+                "Content-Type": "application/json",
+            },
             json={"user_id": "carecompass-backend"},
         )
         user_resp.raise_for_status()
         user_data = user_resp.json()
-        self._user_token = user_data["data"]["access_token"]
+        self._user_token = user_data["access_token"]
         
         return self._user_token
         
