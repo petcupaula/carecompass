@@ -106,10 +106,15 @@ class PlaudClient:
             presign_response.raise_for_status()
             presign_data = presign_response.json()
             
-            file_id = presign_data["data"]["FileId"]
-            upload_id = presign_data["data"]["UploadId"]
-            parts = presign_data["data"]["Parts"]
-            chunk_size = presign_data["data"].get("ChunkSize", 5 * 1024 * 1024)
+            print(f"[Plaud] Presign response: {presign_data}")
+            
+            # Response may have data wrapper or be at root level
+            data = presign_data.get("data", presign_data)
+            
+            file_id = data["FileId"]
+            upload_id = data["UploadId"]
+            parts = data["Parts"]
+            chunk_size = data.get("ChunkSize", 5 * 1024 * 1024)
             
             print(f"[Plaud] Got {len(parts)} part URLs, fileId={file_id}")
             
@@ -149,7 +154,10 @@ class PlaudClient:
             )
             complete_response.raise_for_status()
             complete_data = complete_response.json()
-            download_url = complete_data["data"]["DownloadUrl"]
+            
+            # Response may have data wrapper or be at root level
+            complete_result = complete_data.get("data", complete_data)
+            download_url = complete_result["DownloadUrl"]
             
             print(f"[Plaud] Upload complete, got download URL")
             
