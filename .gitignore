@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment files
+.env
+*.local.xcconfig
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+DerivedData/
+
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Generated Xcode project (regenerate with xcodegen)
+ios-plaud-sdk/ios/PlaudTemplateApp.xcodeproj/
+
+# Uploads
+backend/uploads/
+
+# Logs
+*.log
