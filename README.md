@@ -19,12 +19,6 @@ CareCompass turns every patient conversation into measurable quality improvement
                │  Plaud API      │             │ Interhuman AI   │             │ Crusoe Inference│
                │ (Transcription) │             │ (Engagement)    │             │ (Coaching)      │
                └─────────────────┘             └─────────────────┘             └─────────────────┘
-                                                                                        │
-                                                                                        ▼
-                                                                               ┌─────────────────┐
-                                                                               │     Neo4j       │
-                                                                               │ (Knowledge Graph)│
-                                                                               └─────────────────┘
 ```
 
 ## Components
@@ -37,22 +31,10 @@ CareCompass turns every patient conversation into measurable quality improvement
 
 ### Backend API (`backend/`)
 - FastAPI server orchestrating the analysis pipeline
-- Integrates four services:
+- Integrates three services:
   - **Plaud Transcription API**: Speech-to-text with speaker diarization
   - **Interhuman AI API**: Engagement analysis and conversation quality
   - **Crusoe Inference API**: LLM-powered coaching generation
-  - **Neo4j**: Knowledge graph for tracking coaching patterns over time
-
-### Neo4j Knowledge Graph (Planned)
-Track provider improvement over time with a graph model:
-```
-(:Provider)-[:CONDUCTED]->(:Session)-[:GENERATED]->(:CoachingInsight)
-                              │
-                              └──[:HAS_QUALITY]->(:QualityScore)
-```
-- Identify recurring coaching themes across sessions
-- Track quality score trends per provider
-- Surface patterns: "Rapport scores improve after implementing active listening tips"
 
 ## Quick Start
 
@@ -74,9 +56,6 @@ Track provider improvement over time with a graph model:
 
 **Crusoe** (from [console.crusoecloud.com](https://console.crusoecloud.com)):
 - Inference API Key
-
-**Neo4j** (from [console.neo4j.io](https://console.neo4j.io)):
-- AuraDB Free instance URI, username, and password
 
 ### 2. Configure Backend
 
@@ -159,9 +138,6 @@ open PlaudTemplateApp.xcodeproj
 3. **Coaching Generation** (Crusoe):
    - LLM analyzes transcript + engagement data
    - Generates 2-3 specific, actionable coaching insights
-4. **Knowledge Graph** (Neo4j - planned):
-   - Store sessions, quality scores, and coaching insights as graph nodes
-   - Track patterns and trends across provider sessions over time
 
 ## License
 
