@@ -264,6 +264,14 @@ final class PlaudAPIService {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             AppLog.log("[PlaudAPI] cloud binding <<< HTTP \(status) \(body.prefix(300))")
+            
+            // 404 means device was never bound or was fully unbound — treat as clean slate
+            if status == 404 {
+                AppLog.log("[PlaudAPI] cloud binding: 404 = device not in system, treating as unbound")
+                completion((isBind: false, bindHistory: []))
+                return
+            }
+            
             guard status == 200, let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 completion(nil)

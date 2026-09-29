@@ -149,9 +149,11 @@ final class DeviceManager: NSObject, DeviceManagerProtocol {
 
     func configure(userId: String) {
         RecordingStore.shared.userId = userId
+        let domain = customDomain
+        AppLog.log("[DeviceManager] configure: using domain=\(domain)", level: "SDK")
         PlaudDeviceAgent.shared.initSDK(
             userAccessToken: userAccessToken,
-            customDomain: customDomain
+            customDomain: domain
         )
         PlaudLogUploadManager.shared.setAutoUploadEnabled(false)
         // Raise SDK log retention to 25 files x 20MB = 500MB total (default 10 x 10MB = 100MB)
@@ -358,7 +360,18 @@ final class DeviceManager: NSObject, DeviceManagerProtocol {
             let history = Array(result.bindHistory.filter { seen.insert($0).inserted }
                 .prefix(Self.recoveryMaxAttempts))
             if history.isEmpty {
-                self.failRecovery("Recovery not possible: the device has no bind history."); return
+                // No bind history means device is completely fresh or was factory reset.
+                // Try a direct connect with force-clear using the current user's identity.
+                AppLog.log("[DeviceManager] recovery: no bind history, attempting fresh connect with force-clear")
+                guard let bleDevice = self.cachedBleDevices[sn] else {
+                    self.failRecovery("Device not found, please rescan."); return
+                }
+                // Use the current user's ID for a fresh pairing attempt
+                guard let currentUserId = RecordingStore.shared.userId, !currentUserId.isEmpty else {
+                    self.failRecovery("No user ID configured. Please restart the app."); return
+                }
+                self.recoveryQueue.async { self.runRecovery(device: device, bleDevice: bleDevice, history: [currentUserId]) }
+                return
             }
             guard let bleDevice = self.cachedBleDevices[sn] else {
                 self.failRecovery("Device not found, please rescan."); return

@@ -9,10 +9,10 @@ final class CareCompassAPI {
     private let baseURL: String
     
     private init() {
-        // Default to localhost for development
-        // Change to your deployed backend URL for production
+        // Use your Mac's local IP for development
+        // Your iPhone can't reach "localhost" - that refers to the phone itself
         self.baseURL = ProcessInfo.processInfo.environment["CARECOMPASS_API_URL"] 
-            ?? "http://localhost:8000"
+            ?? "http://10.12.3.176:8000"
     }
     
     // MARK: - Session Management

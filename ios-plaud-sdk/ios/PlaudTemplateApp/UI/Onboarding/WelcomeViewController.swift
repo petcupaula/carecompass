@@ -117,8 +117,15 @@ final class WelcomeViewController: UIViewController {
     // MARK: - Actions
 
     @objc private func getStartedTapped() {
+        // Debug: log the token being used
+        let token = DeviceManager.shared.userAccessToken
+        print("[CareCompass] userAccessToken length: \(token.count)")
+        print("[CareCompass] userAccessToken prefix: \(token.prefix(50))...")
+        
         // Extract sub from partnerToken JWT as userId
         let userId = Self.extractUserId()
+        print("[CareCompass] extracted userId: \(userId)")
+        
         RecordingStore.shared.userId = userId
         DeviceManager.shared.configure(userId: userId)
         pushScanning()

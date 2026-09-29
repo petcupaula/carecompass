@@ -16,7 +16,7 @@ settings:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "14.0"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: W8JQQJQR29
+    # DEVELOPMENT_TEAM: Set in Xcode or remove to use your default team
 
 targets:
   PlaudTemplateApp:
@@ -25,14 +25,15 @@ targets:
     deploymentTarget: "14.0"
     settings:
       base:
-        # Unique bundle id registerable under the signing team (the bare
-        # com.plaud.PlaudTemplateApp is already taken by another team).
-        PRODUCT_BUNDLE_IDENTIFIER: com.plaud.PlaudTemplateApp1
+        # Unique bundle id for your team
+        PRODUCT_BUNDLE_IDENTIFIER: com.interhuman.carecompass
     entitlements:
       path: PlaudTemplateApp/PlaudTemplateApp.entitlements
       properties:
-        com.apple.developer.networking.HotspotConfiguration: true
-        com.apple.developer.networking.wifi-info: true
+        # Note: WiFi entitlements require special Apple approval
+        # For hackathon, BLE sync will work without these
+        # com.apple.developer.networking.HotspotConfiguration: true
+        # com.apple.developer.networking.wifi-info: true
     sources:
       - path: PlaudTemplateApp
     resources:

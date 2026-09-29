@@ -17,11 +17,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             maxFileSize: 50 * 1024 * 1024     // 50 MB per file (1–100MB)
         )
 
+        // One-time migration: clear test server domain override so we default to production.
+        // The token was minted on platform-us.plaud.ai, not platform-test.plaud.ai.
+        let migrationKey = "didMigrateToProdServer_v1"
+        if !UserDefaults.standard.bool(forKey: migrationKey) {
+            let currentOverride = UserDefaults.standard.string(forKey: "serverDomainOverride")
+            AppLog.log("[Migration] serverDomainOverride was: \(currentOverride ?? "nil")", level: "APP")
+            if currentOverride == "platform-test.plaud.ai" || currentOverride == nil {
+                UserDefaults.standard.removeObject(forKey: "serverDomainOverride")
+                AppLog.log("[Migration] Cleared serverDomainOverride → will use platform-us.plaud.ai", level: "APP")
+            }
+            UserDefaults.standard.set(true, forKey: migrationKey)
+        } else {
+            AppLog.log("[Migration] Already migrated to prod server", level: "APP")
+        }
+
         // Build/version stamp so every exported log self-identifies which binary produced it.
         // The marker string also proves the running build includes the latest source — if a log
         // lacks it, the device is running a stale build / cached framework.
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        AppLog.log("=== App launch — build \(build) — marker: wifi-stability-r2 ===", level: "APP")
+        AppLog.log("=== App launch — build \(build) — marker: prod-server-fix ===", level: "APP")
         return true
     }
 

@@ -2,7 +2,7 @@
 
 **AI Shadow Coach for Healthcare Providers**
 
-CareCompass turns every patient conversation into measurable quality improvement. It provides continuous, AI-powered feedback to healthcare providers after every patient interaction - improving HCAHPS scores, patient adherence, and clinical outcomes without adding to provider workload.
+CareCompass turns every patient conversation into measurable quality improvement. It provides continuous, AI-powered feedback to healthcare providers after every patient interaction - improving patient satisfaction, patient adherence, and clinical outcomes without adding to provider workload.
 
 ## Architecture
 
@@ -19,6 +19,12 @@ CareCompass turns every patient conversation into measurable quality improvement
                │  Plaud API      │             │ Interhuman AI   │             │ Crusoe Inference│
                │ (Transcription) │             │ (Engagement)    │             │ (Coaching)      │
                └─────────────────┘             └─────────────────┘             └─────────────────┘
+                                                                                        │
+                                                                                        ▼
+                                                                               ┌─────────────────┐
+                                                                               │     Neo4j       │
+                                                                               │ (Knowledge Graph)│
+                                                                               └─────────────────┘
 ```
 
 ## Components
@@ -31,10 +37,22 @@ CareCompass turns every patient conversation into measurable quality improvement
 
 ### Backend API (`backend/`)
 - FastAPI server orchestrating the analysis pipeline
-- Integrates three APIs:
+- Integrates four services:
   - **Plaud Transcription API**: Speech-to-text with speaker diarization
   - **Interhuman AI API**: Engagement analysis and conversation quality
   - **Crusoe Inference API**: LLM-powered coaching generation
+  - **Neo4j**: Knowledge graph for tracking coaching patterns over time
+
+### Neo4j Knowledge Graph (Planned)
+Track provider improvement over time with a graph model:
+```
+(:Provider)-[:CONDUCTED]->(:Session)-[:GENERATED]->(:CoachingInsight)
+                              │
+                              └──[:HAS_QUALITY]->(:QualityScore)
+```
+- Identify recurring coaching themes across sessions
+- Track quality score trends per provider
+- Surface patterns: "Rapport scores improve after implementing active listening tips"
 
 ## Quick Start
 
@@ -47,15 +65,18 @@ CareCompass turns every patient conversation into measurable quality improvement
 ### 1. Set Up Credentials
 
 **Plaud** (from [portal.plaud.ai](https://portal.plaud.ai)):
-- Client ID
-- Client Secret  
-- API Key
+- `CLIENT_ID` - Identifies your application
+- `SECRET_KEY` - Used to mint user tokens (partner auth)
+- `API_KEY` - Used for Transcription API calls
 
 **Interhuman AI**:
 - API Key with `interhumanai.upload.inter-2-audio` scope
 
 **Crusoe** (from [console.crusoecloud.com](https://console.crusoecloud.com)):
 - Inference API Key
+
+**Neo4j** (from [console.neo4j.io](https://console.neo4j.io)):
+- AuraDB Free instance URI, username, and password
 
 ### 2. Configure Backend
 
@@ -72,14 +93,29 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-### 3. Configure iOS App
+### 3. Generate Plaud User Access Token
+
+The iOS SDK requires a per-user JWT token. Generate one using your Plaud credentials:
+
+```bash
+# From project root
+npx tsx scripts/get-plaud-user-token.ts
+```
+
+This uses your `PLAUD_CLIENT_ID` and `PLAUD_SECRET_KEY` to:
+1. Get a partner access token (Basic auth)
+2. Mint a user access token (valid for 24 hours)
+
+The token is printed to stdout - copy it to your iOS config.
+
+### 4. Configure iOS App
 
 ```bash
 cd ios-plaud-sdk/ios
 
 # Create local config with your Plaud credentials
 cat > PartnerConfig.local.xcconfig << EOF
-USER_ACCESS_TOKEN = your_user_access_token
+USER_ACCESS_TOKEN = <paste token from step 3>
 PLAUD_CLIENT_ID = your_client_id
 PLAUD_API_KEY = your_api_key
 EOF
@@ -91,7 +127,9 @@ xcodegen
 open PlaudTemplateApp.xcodeproj
 ```
 
-### 4. Run
+> **Note:** `PartnerConfig.local.xcconfig` is gitignored. The `USER_ACCESS_TOKEN` expires in 24 hours - regenerate with `npx tsx scripts/get-plaud-user-token.ts`.
+
+### 5. Run
 
 1. Start the backend: `uvicorn app.main:app --reload`
 2. Build and run the iOS app on your physical iPhone
@@ -121,13 +159,17 @@ open PlaudTemplateApp.xcodeproj
 3. **Coaching Generation** (Crusoe):
    - LLM analyzes transcript + engagement data
    - Generates 2-3 specific, actionable coaching insights
+4. **Knowledge Graph** (Neo4j - planned):
+   - Store sessions, quality scores, and coaching insights as graph nodes
+   - Track patterns and trends across provider sessions over time
 
 ## Hackathon Prizes Targeted
 
 - **Crusoe Overall (1st-3rd)**: All LLM inference on Crusoe
 - **Plaud (1st/2nd)**: Deep SDK + API integration
+- **Neo4j**: Knowledge graph for longitudinal coaching insights
 - **UserTesting**: Product validation with healthcare professionals
-- **DuploCloud "Most Sponsor Tools"**: 4+ meaningful integrations
+- **DuploCloud "Most Sponsor Tools"**: 5 meaningful integrations (Crusoe, Plaud, Neo4j, UserTesting, Interhuman AI)
 
 ## License
 
