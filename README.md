@@ -162,13 +162,57 @@ open PlaudTemplateApp.xcodeproj
 
 ## Neo4j Knowledge Graph
 
-When configured, CareCompass stores analysis results in a Neo4j graph:
+### Why Neo4j?
+
+Traditional databases store individual sessions, but **healthcare communication improvement is a journey, not a single event**. Neo4j enables CareCompass to:
+
+1. **Track Progress Over Time** - See how a provider's quality scores evolve across dozens of sessions, not just the latest one
+2. **Identify Patterns** - Discover recurring coaching themes ("You frequently miss opportunities to check understanding") that wouldn't be visible in isolated session data
+3. **Connect the Dots** - Link social signals to coaching outcomes: "Providers who reduced hesitation signals improved rapport scores by 15%"
+4. **Personalize Coaching** - Tailor recommendations based on a provider's history, not generic advice
+
+### Graph Model
 
 ```
-(:Provider)-[:CONDUCTED]->(:Session)-[:HAS_QUALITY]->(:QualityScore)
-                                    -[:GENERATED]->(:CoachingInsight)
-                                    -[:HAS_SIGNAL]->(:SocialSignal)
+(:Provider {id, name})
+    │
+    └──[:CONDUCTED]──▶ (:Session {id, created_at, duration})
+                            │
+                            ├──[:HAS_QUALITY]──▶ (:QualityScore {quality_index, clarity, authority, energy, rapport, learning})
+                            │
+                            ├──[:GENERATED]──▶ (:CoachingInsight {title, description, suggested_action})
+                            │
+                            └──[:HAS_SIGNAL]──▶ (:SocialSignal {type, count})
 ```
+
+### Example Queries
+
+**"How has Dr. Smith's rapport score changed over the last month?"**
+```cypher
+MATCH (p:Provider {id: "dr-smith"})-[:CONDUCTED]->(s:Session)-[:HAS_QUALITY]->(q:QualityScore)
+WHERE s.created_at > datetime() - duration('P30D')
+RETURN s.created_at, q.rapport
+ORDER BY s.created_at
+```
+
+**"What coaching themes keep recurring for this provider?"**
+```cypher
+MATCH (p:Provider {id: "dr-smith"})-[:CONDUCTED]->(:Session)-[:GENERATED]->(c:CoachingInsight)
+RETURN c.title, count(*) as occurrences
+ORDER BY occurrences DESC
+LIMIT 5
+```
+
+### Setup
+
+1. Create a free Neo4j AuraDB instance at [console.neo4j.io](https://console.neo4j.io)
+2. Add credentials to `backend/.env`:
+   ```
+   NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+   NEO4J_USERNAME=neo4j
+   NEO4J_PASSWORD=your_password
+   ```
+3. Sessions are automatically stored when analysis completes
 
 ### Graph API Endpoints
 - `GET /dashboard/graph/trends/{provider_id}` - Quality score trends over time
