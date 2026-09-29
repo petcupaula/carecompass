@@ -33,6 +33,41 @@ CareCompass turns every patient conversation into measurable quality improvement
                └─────────────────┘             └─────────────────┘             └─────────────────┘
 ```
 
+## Why Interhuman AI?
+
+Traditional conversation analysis tells you **what was said**. Interhuman AI tells you **how it landed**.
+
+### The Gap Between Intent and Impact
+
+Healthcare providers often think they've communicated clearly—they used the right words, covered all the points. But patients leave confused, anxious, or disengaged. The problem isn't *what* was said, it's *how* it was received.
+
+Interhuman AI bridges this gap by analyzing the **social signals** in conversation:
+
+| Signal Type | What It Detects | Why It Matters |
+|-------------|-----------------|----------------|
+| **Confusion** | Hesitation, uncertain tone, trailing off | Patient didn't understand the explanation |
+| **Hesitation** | Pauses before responding, hedging language | Patient has concerns they're not voicing |
+| **Agreement** | Affirmative signals, engaged responses | Message landed successfully |
+| **Disengagement** | Flat affect, minimal responses | Patient has mentally checked out |
+
+### What Makes This Possible
+
+1. **Real-time Engagement Status** - Every 10-second window is classified as engaged, neutral, or disengaged. Providers can see exactly *when* they lost the patient.
+
+2. **Social Signal Detection** - Beyond engagement, Interhuman AI detects specific signals (confusion, hesitation, confidence) with timestamps and rationale. This is the "why" behind the engagement drop.
+
+3. **Conversation Quality Index** - Five dimensions (clarity, authority, energy, rapport, learning) scored 0-100. Providers get a holistic view of their communication effectiveness.
+
+### The CareCompass Advantage
+
+By combining Interhuman AI's engagement analysis with transcript data, CareCompass can generate coaching that's **specific and actionable**:
+
+> ❌ Generic: "Try to speak more clearly"
+> 
+> ✅ CareCompass: "At 2:15, you explained the medication dosage. Confusion signals appeared immediately after. Try: 'Let me make sure this is clear—you'll take two pills in the morning with breakfast, and two more with dinner. Does that make sense?'"
+
+The coaching connects the **words** (from transcript) with the **signals** (from Interhuman AI) to show providers exactly what to change and why.
+
 ## Components
 
 ### iOS App (`ios-plaud-sdk/`)
