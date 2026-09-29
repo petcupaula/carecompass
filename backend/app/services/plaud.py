@@ -2,11 +2,16 @@
 Plaud Transcription API Client
 
 Uploads audio files and retrieves transcriptions with speaker diarization.
+
+Auth flow:
+- File Upload API: Bearer user_access_token
+- Transcription API: X-Client-Id + X-Client-Api-Key
 """
 
 import httpx
 import asyncio
 import hashlib
+import base64
 from typing import Optional, List
 from pathlib import Path
 
@@ -21,31 +26,61 @@ class PlaudClient:
         settings = get_settings()
         self.client_id = settings.plaud_client_id
         self.api_key = settings.plaud_api_key
-        # Transcription API uses platform-us.plaud.ai (not /developer/api)
-        self.base_url = "https://platform-us.plaud.ai"
+        self.secret_key = settings.plaud_secret_key
+        self.base_url = "https://platform-us.plaud.ai/developer/api"
+        self._user_token: Optional[str] = None
+        
+    async def _get_user_token(self, client: httpx.AsyncClient) -> str:
+        """Get or refresh user access token."""
+        if self._user_token:
+            return self._user_token
+        
+        # Step 1: Get partner token using Basic auth
+        credentials = f"{self.client_id}:{self.secret_key}"
+        basic_auth = base64.b64encode(credentials.encode()).decode()
+        
+        print("[Plaud] Getting partner token...")
+        partner_resp = await client.post(
+            f"{self.base_url}/open/partner/token",
+            headers={"Authorization": f"Basic {basic_auth}"},
+        )
+        partner_resp.raise_for_status()
+        partner_data = partner_resp.json()
+        partner_token = partner_data["data"]["access_token"]
+        
+        # Step 2: Mint user access token
+        print("[Plaud] Minting user access token...")
+        user_resp = await client.post(
+            f"{self.base_url}/open/partner/users/access-token",
+            headers={"Authorization": f"Bearer {partner_token}"},
+            json={"user_id": "carecompass-backend"},
+        )
+        user_resp.raise_for_status()
+        user_data = user_resp.json()
+        self._user_token = user_data["data"]["access_token"]
+        
+        return self._user_token
         
     async def transcribe_audio(self, audio_path: str) -> List[TranscriptSegment]:
         """
         Upload audio and get transcription with speaker diarization.
-        
-        Args:
-            audio_path: Path to audio file
-            
-        Returns:
-            List of transcript segments with speaker IDs and timestamps
         """
         file_path = Path(audio_path)
         if not file_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
         
-        # Auth headers for transcription API
-        auth_headers = {
-            "X-Client-Id": self.client_id,
-            "X-Client-Api-Key": self.api_key,
-        }
-        
         async with httpx.AsyncClient(timeout=300.0) as client:
-            # Step 1: Get presigned upload URLs
+            # Get user token for file upload
+            user_token = await self._get_user_token(client)
+            
+            # Auth headers for different APIs
+            upload_headers = {"Authorization": f"Bearer {user_token}"}
+            transcription_headers = {
+                "X-Client-Id": self.client_id,
+                "X-Client-Api-Key": self.api_key,
+            }
+            
+            # Read file
             file_data = file_path.read_bytes()
             file_size = len(file_data)
             file_type = file_path.suffix.lstrip('.').lower()
@@ -53,9 +88,10 @@ class PlaudClient:
             
             print(f"[Plaud] Step 1: generate-presigned-urls (size={file_size}, type={file_type})")
             
+            # Step 1: Get presigned upload URLs
             presign_response = await client.post(
                 f"{self.base_url}/open/partner/files/upload/generate-presigned-urls",
-                headers=auth_headers,
+                headers={**upload_headers, "Content-Type": "application/json"},
                 json={
                     "filesize": file_size,
                     "filetype": file_type,
@@ -96,7 +132,7 @@ class PlaudClient:
             
             complete_response = await client.post(
                 f"{self.base_url}/open/partner/files/upload/complete-upload",
-                headers=auth_headers,
+                headers={**upload_headers, "Content-Type": "application/json"},
                 json={
                     "file_id": file_id,
                     "upload_id": upload_id,
@@ -111,12 +147,12 @@ class PlaudClient:
             
             print(f"[Plaud] Upload complete, got download URL")
             
-            # Step 4: Submit transcription job
+            # Step 4: Submit transcription job (uses different auth)
             print(f"[Plaud] Step 4: Submit transcription task")
             
             transcribe_response = await client.post(
                 f"{self.base_url}/open/partner/ai/transcriptions/",
-                headers=auth_headers,
+                headers={**transcription_headers, "Content-Type": "application/json"},
                 json={
                     "file_url": download_url,
                     "params": {
@@ -132,7 +168,7 @@ class PlaudClient:
             print(f"[Plaud] Transcription submitted: id={transcription_id}")
             
             # Step 5: Poll for completion
-            return await self._poll_transcription(client, transcription_id, auth_headers)
+            return await self._poll_transcription(client, transcription_id, transcription_headers)
     
     async def _poll_transcription(
         self, 

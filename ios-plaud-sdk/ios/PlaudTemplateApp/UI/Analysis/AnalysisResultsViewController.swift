@@ -44,6 +44,20 @@ final class AnalysisResultsViewController: UIViewController {
         return btn
     }()
     
+    private let regenerateButton: UIButton = {
+        let btn = UIButton(type: .custom)
+        btn.setTitle("🔄 Regenerate Insights", for: .normal)
+        btn.setTitleColor(UIColor(hex: "#2563EB"), for: .normal)
+        btn.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        btn.backgroundColor = UIColor(hex: "#EFF6FF")
+        btn.layer.cornerRadius = 8
+        btn.layer.borderWidth = 1
+        btn.layer.borderColor = UIColor(hex: "#2563EB")?.cgColor
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        btn.isHidden = true
+        return btn
+    }()
+    
     private let activityIndicator: UIActivityIndicatorView = {
         let ai = UIActivityIndicatorView(style: .large)
         ai.hidesWhenStopped = true
@@ -96,6 +110,7 @@ final class AnalysisResultsViewController: UIViewController {
         contentStack.addArrangedSubview(statusLabel)
         contentStack.addArrangedSubview(activityIndicator)
         contentStack.addArrangedSubview(analyzeButton)
+        contentStack.addArrangedSubview(regenerateButton)
         contentStack.addArrangedSubview(qualityCard)
         contentStack.addArrangedSubview(engagementCard)
         contentStack.addArrangedSubview(coachingCard)
@@ -106,6 +121,7 @@ final class AnalysisResultsViewController: UIViewController {
         coachingCard.isHidden = true
         
         analyzeButton.addTarget(self, action: #selector(analyzeTapped), for: .touchUpInside)
+        regenerateButton.addTarget(self, action: #selector(regenerateTapped), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -120,6 +136,7 @@ final class AnalysisResultsViewController: UIViewController {
             contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -48),
             
             analyzeButton.heightAnchor.constraint(equalToConstant: 48),
+            regenerateButton.heightAnchor.constraint(equalToConstant: 40),
         ])
     }
     
@@ -159,12 +176,15 @@ final class AnalysisResultsViewController: UIViewController {
             activityIndicator.stopAnimating()
             analyzeButton.isEnabled = true
             analyzeButton.alpha = 1
+            regenerateButton.isEnabled = true
+            regenerateButton.alpha = 1
             
         case .creatingSession:
             statusLabel.text = "Creating session..."
             activityIndicator.startAnimating()
             analyzeButton.isEnabled = false
             analyzeButton.alpha = 0.5
+            regenerateButton.isHidden = true
             
         case .uploading(let progress):
             statusLabel.text = "Uploading audio... \(Int(progress * 100))%"
@@ -181,6 +201,8 @@ final class AnalysisResultsViewController: UIViewController {
             activityIndicator.stopAnimating()
             analyzeButton.isEnabled = true
             analyzeButton.alpha = 1
+            analyzeButton.isHidden = false
+            regenerateButton.isHidden = true
             statusLabel.text = "Analysis failed: \(error)"
             statusLabel.textColor = .systemRed
         }
@@ -189,6 +211,7 @@ final class AnalysisResultsViewController: UIViewController {
     private func showResults(_ session: SessionResponse) {
         statusLabel.isHidden = true
         analyzeButton.isHidden = true
+        regenerateButton.isHidden = false  // Show regenerate button
         
         // Show quality scores
         if let quality = session.conversationQuality {
@@ -227,6 +250,23 @@ final class AnalysisResultsViewController: UIViewController {
             return
         }
         
+        analysisManager.analyze(file: file)
+    }
+    
+    @objc private func regenerateTapped() {
+        // Reset UI to show processing state
+        statusLabel.isHidden = false
+        statusLabel.textColor = UIColor(hex: "#757575")
+        regenerateButton.isHidden = true
+        qualityCard.isHidden = true
+        engagementCard.isHidden = true
+        coachingCard.isHidden = true
+        
+        // Clear cached results
+        RecordingStore.shared.updateAnalysisStatus(id: file.id, status: "pending")
+        
+        // Re-run analysis
+        analysisManager.reset()
         analysisManager.analyze(file: file)
     }
 }
