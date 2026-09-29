@@ -48,8 +48,8 @@ targets:
     info:
       path: PlaudTemplateApp/Info.plist
       properties:
-        CFBundleShortVersionString: "1.0.57"
-        CFBundleVersion: "57"
+        CFBundleShortVersionString: "1.0.59"
+        CFBundleVersion: "59"
         UILaunchScreen:
           UIColorName: "systemBackground"
         UserAccessToken: $(USER_ACCESS_TOKEN)

@@ -163,14 +163,6 @@ open PlaudTemplateApp.xcodeproj
    - Store sessions, quality scores, and coaching insights as graph nodes
    - Track patterns and trends across provider sessions over time
 
-## Hackathon Prizes Targeted
-
-- **Crusoe Overall (1st-3rd)**: All LLM inference on Crusoe
-- **Plaud (1st/2nd)**: Deep SDK + API integration
-- **Neo4j**: Knowledge graph for longitudinal coaching insights
-- **UserTesting**: Product validation with healthcare professionals
-- **DuploCloud "Most Sponsor Tools"**: 5 meaningful integrations (Crusoe, Plaud, Neo4j, UserTesting, Interhuman AI)
-
 ## License
 
 MIT

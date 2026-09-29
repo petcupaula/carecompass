@@ -629,6 +629,12 @@ final class FileDetailViewController: UIViewController {
 
     @objc private func showMoreActions() {
         let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        // CareCompass Analysis - primary action
+        sheet.addAction(UIAlertAction(title: "🩺 CareCompass Analysis", style: .default) { [weak self] _ in
+            self?.showCareCompassAnalysis()
+        })
+        
         sheet.addAction(UIAlertAction(title: "Export Audio", style: .default) { [weak self] _ in self?.handleExport() })
         if let summary = file.summaryText, !summary.isEmpty {
             sheet.addAction(UIAlertAction(title: "Copy Summary", style: .default) { _ in UIPasteboard.general.string = summary })
@@ -641,6 +647,12 @@ final class FileDetailViewController: UIViewController {
         sheet.addAction(UIAlertAction(title: "Delete Recording", style: .destructive) { [weak self] _ in self?.handleDelete() })
         sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(sheet, animated: true)
+    }
+    
+    private func showCareCompassAnalysis() {
+        let analysisVC = AnalysisResultsViewController(file: file)
+        let nav = UINavigationController(rootViewController: analysisVC)
+        present(nav, animated: true)
     }
 
     private func handleExport() {

@@ -12,8 +12,14 @@ struct RecordingFile: Identifiable, Codable {
     var localPath: String?            // Local audio path (available after sync)
     var summaryText: String?          // AI summary
     var transcriptJSON: String?       // Transcription data JSON
+    
+    // CareCompass analysis
+    var careCompassSessionId: String? // Backend session ID for analysis
+    var analysisStatus: String?       // pending, transcribing, analyzing, generating_coaching, completed, failed
+    var analysisJSON: String?         // Full analysis results JSON
 
     var isSynced: Bool { localPath != nil }
+    var isAnalyzed: Bool { analysisStatus == "completed" }
 }
 
 extension RecordingFile {

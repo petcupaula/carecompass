@@ -1,64 +1,84 @@
 import UIKit
+import Combine
 
-/// Displays CareCompass analysis results: engagement timeline, quality scores, and coaching insights
+/// CareCompass Analysis Results View
+/// Shows engagement analysis, conversation quality, and coaching insights
 final class AnalysisResultsViewController: UIViewController {
     
-    // MARK: - Properties
-    
-    private let session: SessionResponse
+    // MARK: - Dependencies
+    private var file: RecordingFile
+    private let analysisManager = AnalysisManager.shared
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Views
-    
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
     
-    // Quality Score Card
-    private let qualityCard = UIView()
-    private let qualityScoreLabel = UILabel()
-    private let qualityTitleLabel = UILabel()
+    private let headerLabel: UILabel = {
+        let l = UILabel()
+        l.text = "CareCompass Analysis"
+        l.font = .systemFont(ofSize: 24, weight: .semibold)
+        l.textColor = .black
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
     
-    // Dimension Scores
-    private let dimensionsStack = UIStackView()
+    private let statusLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 14)
+        l.textColor = UIColor(hex: "#757575")
+        l.textAlignment = .center
+        l.numberOfLines = 0
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
     
-    // Engagement Timeline
-    private let timelineCard = UIView()
-    private let timelineTitleLabel = UILabel()
-    private let timelineStack = UIStackView()
+    private let analyzeButton: UIButton = {
+        let btn = UIButton(type: .custom)
+        btn.setTitle("Analyze with CareCompass", for: .normal)
+        btn.setTitleColor(.white, for: .normal)
+        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        btn.backgroundColor = UIColor(hex: "#2563EB") // Blue
+        btn.layer.cornerRadius = 12
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        return btn
+    }()
     
-    // Coaching Insights
-    private let coachingCard = UIView()
-    private let coachingTitleLabel = UILabel()
-    private let coachingStack = UIStackView()
+    private let activityIndicator: UIActivityIndicatorView = {
+        let ai = UIActivityIndicatorView(style: .large)
+        ai.hidesWhenStopped = true
+        ai.translatesAutoresizingMaskIntoConstraints = false
+        return ai
+    }()
     
-    // MARK: - Init
+    // Results sections
+    private let qualityCard = QualityScoreCard()
+    private let engagementCard = EngagementTimelineCard()
+    private let coachingCard = CoachingInsightsCard()
     
-    init(session: SessionResponse) {
-        self.session = session
+    init(file: RecordingFile) {
+        self.file = file
         super.init(nibName: nil, bundle: nil)
     }
-    
     required init?(coder: NSCoder) { fatalError() }
     
     // MARK: - Lifecycle
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.systemGroupedBackground
-        title = "Analysis Results"
+        view.backgroundColor = .white
         setupNavBar()
         setupLayout()
-        populateData()
+        setupBindings()
+        loadExistingResults()
     }
     
     // MARK: - Setup
     
     private func setupNavBar() {
-        let closeBtn = UIBarButtonItem(
-            barButtonSystemItem: .close,
-            target: self,
-            action: #selector(closeTapped)
-        )
-        navigationItem.rightBarButtonItem = closeBtn
+        title = "Analysis"
+        let closeBtn = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(closeTapped))
+        navigationItem.leftBarButtonItem = closeBtn
     }
     
     private func setupLayout() {
@@ -67,9 +87,25 @@ final class AnalysisResultsViewController: UIViewController {
         view.addSubview(scrollView)
         
         contentStack.axis = .vertical
-        contentStack.spacing = 20
+        contentStack.spacing = 24
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentStack)
+        
+        // Add views to stack
+        contentStack.addArrangedSubview(headerLabel)
+        contentStack.addArrangedSubview(statusLabel)
+        contentStack.addArrangedSubview(activityIndicator)
+        contentStack.addArrangedSubview(analyzeButton)
+        contentStack.addArrangedSubview(qualityCard)
+        contentStack.addArrangedSubview(engagementCard)
+        contentStack.addArrangedSubview(coachingCard)
+        
+        // Initially hide result cards
+        qualityCard.isHidden = true
+        engagementCard.isHidden = true
+        coachingCard.isHidden = true
+        
+        analyzeButton.addTarget(self, action: #selector(analyzeTapped), for: .touchUpInside)
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -77,233 +113,388 @@ final class AnalysisResultsViewController: UIViewController {
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             
-            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 20),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -20),
-            contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 16),
-            contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -16),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32),
-        ])
-        
-        setupQualityCard()
-        setupTimelineCard()
-        setupCoachingCard()
-        
-        contentStack.addArrangedSubview(qualityCard)
-        contentStack.addArrangedSubview(timelineCard)
-        contentStack.addArrangedSubview(coachingCard)
-    }
-    
-    private func setupQualityCard() {
-        qualityCard.backgroundColor = .white
-        qualityCard.layer.cornerRadius = 16
-        qualityCard.translatesAutoresizingMaskIntoConstraints = false
-        
-        qualityTitleLabel.text = "Conversation Quality"
-        qualityTitleLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        qualityTitleLabel.textColor = .secondaryLabel
-        qualityTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        qualityScoreLabel.font = .systemFont(ofSize: 64, weight: .light)
-        qualityScoreLabel.textColor = .label
-        qualityScoreLabel.textAlignment = .center
-        qualityScoreLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        dimensionsStack.axis = .horizontal
-        dimensionsStack.distribution = .fillEqually
-        dimensionsStack.spacing = 8
-        dimensionsStack.translatesAutoresizingMaskIntoConstraints = false
-        
-        qualityCard.addSubview(qualityTitleLabel)
-        qualityCard.addSubview(qualityScoreLabel)
-        qualityCard.addSubview(dimensionsStack)
-        
-        NSLayoutConstraint.activate([
-            qualityTitleLabel.topAnchor.constraint(equalTo: qualityCard.topAnchor, constant: 16),
-            qualityTitleLabel.leadingAnchor.constraint(equalTo: qualityCard.leadingAnchor, constant: 16),
+            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: 24),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -24),
+            contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 24),
+            contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -24),
+            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -48),
             
-            qualityScoreLabel.topAnchor.constraint(equalTo: qualityTitleLabel.bottomAnchor, constant: 8),
-            qualityScoreLabel.centerXAnchor.constraint(equalTo: qualityCard.centerXAnchor),
-            
-            dimensionsStack.topAnchor.constraint(equalTo: qualityScoreLabel.bottomAnchor, constant: 16),
-            dimensionsStack.leadingAnchor.constraint(equalTo: qualityCard.leadingAnchor, constant: 16),
-            dimensionsStack.trailingAnchor.constraint(equalTo: qualityCard.trailingAnchor, constant: -16),
-            dimensionsStack.bottomAnchor.constraint(equalTo: qualityCard.bottomAnchor, constant: -16),
+            analyzeButton.heightAnchor.constraint(equalToConstant: 48),
         ])
     }
     
-    private func setupTimelineCard() {
-        timelineCard.backgroundColor = .white
-        timelineCard.layer.cornerRadius = 16
-        timelineCard.translatesAutoresizingMaskIntoConstraints = false
-        
-        timelineTitleLabel.text = "Engagement Timeline"
-        timelineTitleLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        timelineTitleLabel.textColor = .secondaryLabel
-        timelineTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        timelineStack.axis = .horizontal
-        timelineStack.distribution = .fillEqually
-        timelineStack.spacing = 2
-        timelineStack.translatesAutoresizingMaskIntoConstraints = false
-        
-        timelineCard.addSubview(timelineTitleLabel)
-        timelineCard.addSubview(timelineStack)
-        
-        NSLayoutConstraint.activate([
-            timelineTitleLabel.topAnchor.constraint(equalTo: timelineCard.topAnchor, constant: 16),
-            timelineTitleLabel.leadingAnchor.constraint(equalTo: timelineCard.leadingAnchor, constant: 16),
-            
-            timelineStack.topAnchor.constraint(equalTo: timelineTitleLabel.bottomAnchor, constant: 12),
-            timelineStack.leadingAnchor.constraint(equalTo: timelineCard.leadingAnchor, constant: 16),
-            timelineStack.trailingAnchor.constraint(equalTo: timelineCard.trailingAnchor, constant: -16),
-            timelineStack.heightAnchor.constraint(equalToConstant: 40),
-            timelineStack.bottomAnchor.constraint(equalTo: timelineCard.bottomAnchor, constant: -16),
-        ])
+    private func setupBindings() {
+        analysisManager.statePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                self?.updateUI(for: state)
+            }
+            .store(in: &cancellables)
     }
     
-    private func setupCoachingCard() {
-        coachingCard.backgroundColor = .white
-        coachingCard.layer.cornerRadius = 16
-        coachingCard.translatesAutoresizingMaskIntoConstraints = false
+    private func loadExistingResults() {
+        // Refresh from store
+        if let fresh = RecordingStore.shared.allFiles.first(where: { $0.id == file.id }) {
+            file = fresh
+        }
         
-        coachingTitleLabel.text = "Coaching Insights"
-        coachingTitleLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        coachingTitleLabel.textColor = .secondaryLabel
-        coachingTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        coachingStack.axis = .vertical
-        coachingStack.spacing = 16
-        coachingStack.translatesAutoresizingMaskIntoConstraints = false
-        
-        coachingCard.addSubview(coachingTitleLabel)
-        coachingCard.addSubview(coachingStack)
-        
-        NSLayoutConstraint.activate([
-            coachingTitleLabel.topAnchor.constraint(equalTo: coachingCard.topAnchor, constant: 16),
-            coachingTitleLabel.leadingAnchor.constraint(equalTo: coachingCard.leadingAnchor, constant: 16),
-            
-            coachingStack.topAnchor.constraint(equalTo: coachingTitleLabel.bottomAnchor, constant: 12),
-            coachingStack.leadingAnchor.constraint(equalTo: coachingCard.leadingAnchor, constant: 16),
-            coachingStack.trailingAnchor.constraint(equalTo: coachingCard.trailingAnchor, constant: -16),
-            coachingStack.bottomAnchor.constraint(equalTo: coachingCard.bottomAnchor, constant: -16),
-        ])
+        if let json = file.analysisJSON,
+           let data = json.data(using: .utf8),
+           let session = try? JSONDecoder().decode(SessionResponse.self, from: data) {
+            showResults(session)
+        } else if file.analysisStatus == "completed" {
+            statusLabel.text = "Analysis complete but results not cached. Tap to re-analyze."
+        } else if let status = file.analysisStatus, status != "completed" && status != "failed" {
+            statusLabel.text = "Analysis in progress: \(status)"
+        } else {
+            statusLabel.text = "Analyze this recording to get engagement insights and coaching recommendations."
+        }
     }
     
-    // MARK: - Data Population
+    // MARK: - UI Updates
     
-    private func populateData() {
-        // Quality Score
+    private func updateUI(for state: AnalysisManager.AnalysisState) {
+        switch state {
+        case .idle:
+            activityIndicator.stopAnimating()
+            analyzeButton.isEnabled = true
+            analyzeButton.alpha = 1
+            
+        case .creatingSession:
+            statusLabel.text = "Creating session..."
+            activityIndicator.startAnimating()
+            analyzeButton.isEnabled = false
+            analyzeButton.alpha = 0.5
+            
+        case .uploading(let progress):
+            statusLabel.text = "Uploading audio... \(Int(progress * 100))%"
+            
+        case .analyzing(let status):
+            statusLabel.text = status
+            
+        case .completed(let session):
+            activityIndicator.stopAnimating()
+            analyzeButton.isHidden = true
+            showResults(session)
+            
+        case .failed(let error):
+            activityIndicator.stopAnimating()
+            analyzeButton.isEnabled = true
+            analyzeButton.alpha = 1
+            statusLabel.text = "Analysis failed: \(error)"
+            statusLabel.textColor = .systemRed
+        }
+    }
+    
+    private func showResults(_ session: SessionResponse) {
+        statusLabel.isHidden = true
+        analyzeButton.isHidden = true
+        
+        // Show quality scores
         if let quality = session.conversationQuality {
-            qualityScoreLabel.text = String(format: "%.0f", quality.qualityIndex)
-            
-            // Add dimension scores
-            let dimensions = [
-                ("Clarity", quality.clarity),
-                ("Authority", quality.authority),
-                ("Energy", quality.energy),
-                ("Rapport", quality.rapport),
-                ("Learning", quality.learning),
-            ]
-            
-            for (name, score) in dimensions {
-                let view = createDimensionView(name: name, score: score)
-                dimensionsStack.addArrangedSubview(view)
-            }
-        } else {
-            qualityScoreLabel.text = "--"
+            qualityCard.configure(with: quality)
+            qualityCard.isHidden = false
         }
         
-        // Engagement Timeline
-        if let windows = session.engagementWindows {
-            for window in windows {
-                let bar = UIView()
-                bar.layer.cornerRadius = 4
-                
-                switch window.engagementStatus {
-                case "engaged":
-                    bar.backgroundColor = UIColor.systemGreen
-                case "neutral":
-                    bar.backgroundColor = UIColor.systemYellow
-                case "disengaged":
-                    bar.backgroundColor = UIColor.systemRed
-                default:
-                    bar.backgroundColor = UIColor.systemGray
-                }
-                
-                timelineStack.addArrangedSubview(bar)
-            }
+        // Show engagement timeline
+        if let windows = session.engagementWindows, !windows.isEmpty {
+            engagementCard.configure(with: windows)
+            engagementCard.isHidden = false
         }
         
-        // Coaching Insights
-        if let insights = session.coachingInsights {
-            for insight in insights {
-                let view = createCoachingInsightView(insight: insight)
-                coachingStack.addArrangedSubview(view)
-            }
-        } else {
-            let emptyLabel = UILabel()
-            emptyLabel.text = "No coaching insights available"
-            emptyLabel.textColor = .secondaryLabel
-            emptyLabel.font = .systemFont(ofSize: 14)
-            coachingStack.addArrangedSubview(emptyLabel)
+        // Show coaching insights
+        if let insights = session.coachingInsights, !insights.isEmpty {
+            coachingCard.configure(with: insights)
+            coachingCard.isHidden = false
         }
     }
     
-    private func createDimensionView(name: String, score: Double) -> UIView {
+    // MARK: - Actions
+    
+    @objc private func closeTapped() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func analyzeTapped() {
+        guard file.isSynced else {
+            let alert = UIAlertController(
+                title: "File Not Synced",
+                message: "Please sync this recording first.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        analysisManager.analyze(file: file)
+    }
+}
+
+// MARK: - Quality Score Card
+
+final class QualityScoreCard: UIView {
+    
+    private let titleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Conversation Quality"
+        l.font = .systemFont(ofSize: 18, weight: .semibold)
+        l.textColor = .black
+        return l
+    }()
+    
+    private let overallScoreLabel: UILabel = {
+        let l = UILabel()
+        l.font = .systemFont(ofSize: 48, weight: .bold)
+        l.textColor = UIColor(hex: "#2563EB")
+        l.textAlignment = .center
+        return l
+    }()
+    
+    private let scoresStack = UIStackView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayout()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    
+    private func setupLayout() {
+        backgroundColor = UIColor(hex: "#F8FAFC")
+        layer.cornerRadius = 12
+        
+        let stack = UIStackView(arrangedSubviews: [titleLabel, overallScoreLabel, scoresStack])
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        
+        scoresStack.axis = .vertical
+        scoresStack.spacing = 8
+        
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+        ])
+    }
+    
+    func configure(with quality: ConversationQualityResponse) {
+        overallScoreLabel.text = "\(Int(quality.qualityIndex))"
+        
+        scoresStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        let scores: [(String, Double)] = [
+            ("Clarity", quality.clarity),
+            ("Authority", quality.authority),
+            ("Energy", quality.energy),
+            ("Rapport", quality.rapport),
+            ("Learning", quality.learning),
+        ]
+        
+        for (name, value) in scores {
+            let row = createScoreRow(name: name, value: value)
+            scoresStack.addArrangedSubview(row)
+        }
+    }
+    
+    private func createScoreRow(name: String, value: Double) -> UIView {
         let container = UIView()
         
         let nameLabel = UILabel()
         nameLabel.text = name
-        nameLabel.font = .systemFont(ofSize: 11)
-        nameLabel.textColor = .secondaryLabel
-        nameLabel.textAlignment = .center
+        nameLabel.font = .systemFont(ofSize: 14)
+        nameLabel.textColor = UIColor(hex: "#64748B")
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         
-        let scoreLabel = UILabel()
-        scoreLabel.text = String(format: "%.0f", score)
-        scoreLabel.font = .systemFont(ofSize: 20, weight: .medium)
-        scoreLabel.textColor = colorForScore(score)
-        scoreLabel.textAlignment = .center
-        scoreLabel.translatesAutoresizingMaskIntoConstraints = false
+        let valueLabel = UILabel()
+        valueLabel.text = "\(Int(value))"
+        valueLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        valueLabel.textColor = .black
+        valueLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let progressBg = UIView()
+        progressBg.backgroundColor = UIColor(hex: "#E2E8F0")
+        progressBg.layer.cornerRadius = 4
+        progressBg.translatesAutoresizingMaskIntoConstraints = false
+        
+        let progressFill = UIView()
+        progressFill.backgroundColor = UIColor(hex: "#2563EB")
+        progressFill.layer.cornerRadius = 4
+        progressFill.translatesAutoresizingMaskIntoConstraints = false
         
         container.addSubview(nameLabel)
-        container.addSubview(scoreLabel)
+        container.addSubview(valueLabel)
+        container.addSubview(progressBg)
+        progressBg.addSubview(progressFill)
         
         NSLayoutConstraint.activate([
-            scoreLabel.topAnchor.constraint(equalTo: container.topAnchor),
-            scoreLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            nameLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            nameLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            nameLabel.widthAnchor.constraint(equalToConstant: 80),
             
-            nameLabel.topAnchor.constraint(equalTo: scoreLabel.bottomAnchor, constant: 2),
-            nameLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            nameLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            progressBg.leadingAnchor.constraint(equalTo: nameLabel.trailingAnchor, constant: 8),
+            progressBg.trailingAnchor.constraint(equalTo: valueLabel.leadingAnchor, constant: -8),
+            progressBg.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            progressBg.heightAnchor.constraint(equalToConstant: 8),
+            
+            progressFill.leadingAnchor.constraint(equalTo: progressBg.leadingAnchor),
+            progressFill.topAnchor.constraint(equalTo: progressBg.topAnchor),
+            progressFill.bottomAnchor.constraint(equalTo: progressBg.bottomAnchor),
+            progressFill.widthAnchor.constraint(equalTo: progressBg.widthAnchor, multiplier: CGFloat(value / 100)),
+            
+            valueLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            valueLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            valueLabel.widthAnchor.constraint(equalToConstant: 30),
+            
+            container.heightAnchor.constraint(equalToConstant: 24),
         ])
         
         return container
     }
+}
+
+// MARK: - Engagement Timeline Card
+
+final class EngagementTimelineCard: UIView {
     
-    private func createCoachingInsightView(insight: CoachingInsightResponse) -> UIView {
+    private let titleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Engagement Timeline"
+        l.font = .systemFont(ofSize: 18, weight: .semibold)
+        l.textColor = .black
+        return l
+    }()
+    
+    private let timelineStack = UIStackView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayout()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    
+    private func setupLayout() {
+        backgroundColor = UIColor(hex: "#F8FAFC")
+        layer.cornerRadius = 12
+        
+        let stack = UIStackView(arrangedSubviews: [titleLabel, timelineStack])
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        
+        timelineStack.axis = .horizontal
+        timelineStack.spacing = 2
+        timelineStack.distribution = .fillEqually
+        
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            
+            timelineStack.heightAnchor.constraint(equalToConstant: 32),
+        ])
+    }
+    
+    func configure(with windows: [EngagementWindowResponse]) {
+        timelineStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for window in windows {
+            let bar = UIView()
+            bar.layer.cornerRadius = 4
+            
+            switch window.engagementStatus.lowercased() {
+            case "engaged":
+                bar.backgroundColor = UIColor(hex: "#22C55E") // Green
+            case "neutral":
+                bar.backgroundColor = UIColor(hex: "#F59E0B") // Yellow
+            case "disengaged":
+                bar.backgroundColor = UIColor(hex: "#EF4444") // Red
+            default:
+                bar.backgroundColor = UIColor(hex: "#94A3B8") // Gray
+            }
+            
+            timelineStack.addArrangedSubview(bar)
+        }
+    }
+}
+
+// MARK: - Coaching Insights Card
+
+final class CoachingInsightsCard: UIView {
+    
+    private let titleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Coaching Insights"
+        l.font = .systemFont(ofSize: 18, weight: .semibold)
+        l.textColor = .black
+        return l
+    }()
+    
+    private let insightsStack = UIStackView()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupLayout()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    
+    private func setupLayout() {
+        backgroundColor = UIColor(hex: "#F8FAFC")
+        layer.cornerRadius = 12
+        
+        let stack = UIStackView(arrangedSubviews: [titleLabel, insightsStack])
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        
+        insightsStack.axis = .vertical
+        insightsStack.spacing = 16
+        
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+        ])
+    }
+    
+    func configure(with insights: [CoachingInsightResponse]) {
+        insightsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for insight in insights {
+            let card = createInsightCard(insight)
+            insightsStack.addArrangedSubview(card)
+        }
+    }
+    
+    private func createInsightCard(_ insight: CoachingInsightResponse) -> UIView {
         let container = UIView()
-        container.backgroundColor = UIColor.systemGray6
-        container.layer.cornerRadius = 12
+        container.backgroundColor = .white
+        container.layer.cornerRadius = 8
         
         let titleLabel = UILabel()
         titleLabel.text = insight.title
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        titleLabel.textColor = .label
+        titleLabel.textColor = .black
         titleLabel.numberOfLines = 0
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         let descLabel = UILabel()
         descLabel.text = insight.description
         descLabel.font = .systemFont(ofSize: 14)
-        descLabel.textColor = .secondaryLabel
+        descLabel.textColor = UIColor(hex: "#64748B")
         descLabel.numberOfLines = 0
         descLabel.translatesAutoresizingMaskIntoConstraints = false
         
         let actionLabel = UILabel()
-        actionLabel.text = "💡 " + insight.suggestedAction
+        actionLabel.text = "💡 \(insight.suggestedAction)"
         actionLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        actionLabel.textColor = .systemBlue
+        actionLabel.textColor = UIColor(hex: "#2563EB")
         actionLabel.numberOfLines = 0
         actionLabel.translatesAutoresizingMaskIntoConstraints = false
         
@@ -327,21 +518,5 @@ final class AnalysisResultsViewController: UIViewController {
         ])
         
         return container
-    }
-    
-    private func colorForScore(_ score: Double) -> UIColor {
-        if score >= 70 {
-            return .systemGreen
-        } else if score >= 50 {
-            return .systemYellow
-        } else {
-            return .systemRed
-        }
-    }
-    
-    // MARK: - Actions
-    
-    @objc private func closeTapped() {
-        dismiss(animated: true)
     }
 }

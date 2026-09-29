@@ -178,6 +178,27 @@ final class RecordingStore {
         saveToDisk()
     }
 
+    // MARK: - CareCompass Analysis
+
+    func updateCareCompassSession(id: String, sessionId: String) {
+        guard let idx = cache.firstIndex(where: { $0.id == id }) else { return }
+        cache[idx].careCompassSessionId = sessionId
+        saveToDisk()
+    }
+
+    func updateAnalysisStatus(id: String, status: String) {
+        guard let idx = cache.firstIndex(where: { $0.id == id }) else { return }
+        cache[idx].analysisStatus = status
+        saveToDisk()
+    }
+
+    func updateAnalysisResults(id: String, json: String) {
+        guard let idx = cache.firstIndex(where: { $0.id == id }) else { return }
+        cache[idx].analysisJSON = json
+        cache[idx].analysisStatus = "completed"
+        saveToDisk()
+    }
+
     func replaceAllFiles(_ files: [RecordingFile]) {
         cache = files
         saveToDisk()
