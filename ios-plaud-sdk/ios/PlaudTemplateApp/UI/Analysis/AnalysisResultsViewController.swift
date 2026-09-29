@@ -1,7 +1,7 @@
 import UIKit
 import Combine
 
-/// CareCompass Analysis Results View
+/// Coaching Insights Results View
 /// Shows engagement analysis, conversation quality, and coaching insights
 final class AnalysisResultsViewController: UIViewController {
     
@@ -16,7 +16,7 @@ final class AnalysisResultsViewController: UIViewController {
     
     private let headerLabel: UILabel = {
         let l = UILabel()
-        l.text = "CareCompass Analysis"
+        l.text = "Coaching Insights"
         l.font = .systemFont(ofSize: 24, weight: .semibold)
         l.textColor = .black
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -35,7 +35,7 @@ final class AnalysisResultsViewController: UIViewController {
     
     private let analyzeButton: UIButton = {
         let btn = UIButton(type: .custom)
-        btn.setTitle("Analyze with CareCompass", for: .normal)
+        btn.setTitle("Generate Coaching Insights", for: .normal)
         btn.setTitleColor(.white, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
         btn.backgroundColor = UIColor(hex: "#2563EB") // Blue

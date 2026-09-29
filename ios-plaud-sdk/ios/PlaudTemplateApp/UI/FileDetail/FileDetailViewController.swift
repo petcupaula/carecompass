@@ -630,8 +630,8 @@ final class FileDetailViewController: UIViewController {
     @objc private func showMoreActions() {
         let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         
-        // CareCompass Analysis - primary action
-        sheet.addAction(UIAlertAction(title: "🩺 CareCompass Analysis", style: .default) { [weak self] _ in
+        // Coaching Insights - primary action
+        sheet.addAction(UIAlertAction(title: "🩺 Coaching Insights", style: .default) { [weak self] _ in
             self?.showCareCompassAnalysis()
         })
         
