@@ -4,6 +4,18 @@
 
 CareCompass turns every patient conversation into measurable quality improvement. It provides continuous, AI-powered feedback to healthcare providers after every patient interaction - improving patient satisfaction, patient adherence, and clinical outcomes without adding to provider workload.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/home-screen.png" width="250" alt="Home Screen" />
+  <img src="docs/recording-menu.png" width="250" alt="Recording Menu" />
+  <img src="docs/coaching-insights.png" width="250" alt="Coaching Insights" />
+</p>
+
+**Left:** Home screen with connected Plaud NotePin S and recent recordings  
+**Center:** Recording detail with "Coaching Insights" action  
+**Right:** AI-generated coaching insights with conversation quality scores, engagement timeline, and detected social signals
+
 ## Architecture
 
 ```
