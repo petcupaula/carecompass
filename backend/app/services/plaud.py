@@ -6,6 +6,7 @@ Uploads audio files and retrieves transcriptions with speaker diarization.
 
 import httpx
 import asyncio
+import hashlib
 from typing import Optional, List
 from pathlib import Path
 
@@ -20,7 +21,8 @@ class PlaudClient:
         settings = get_settings()
         self.client_id = settings.plaud_client_id
         self.api_key = settings.plaud_api_key
-        self.base_url = settings.plaud_base_url
+        # Transcription API uses platform-us.plaud.ai (not /developer/api)
+        self.base_url = "https://platform-us.plaud.ai"
         
     async def transcribe_audio(self, audio_path: str) -> List[TranscriptSegment]:
         """
@@ -36,97 +38,131 @@ class PlaudClient:
         if not file_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
         
+        # Auth headers for transcription API
+        auth_headers = {
+            "X-Client-Id": self.client_id,
+            "X-Client-Api-Key": self.api_key,
+        }
+        
         async with httpx.AsyncClient(timeout=300.0) as client:
-            # Step 1: Get presigned upload URL
-            file_size = file_path.stat().st_size
+            # Step 1: Get presigned upload URLs
+            file_data = file_path.read_bytes()
+            file_size = len(file_data)
+            file_type = file_path.suffix.lstrip('.').lower()
+            file_md5 = hashlib.md5(file_data).hexdigest()
+            
+            print(f"[Plaud] Step 1: generate-presigned-urls (size={file_size}, type={file_type})")
+            
             presign_response = await client.post(
                 f"{self.base_url}/open/partner/files/upload/generate-presigned-urls",
-                headers={
-                    "X-Client-Id": self.client_id,
-                    "X-Client-Api-Key": self.api_key,
-                },
+                headers=auth_headers,
                 json={
-                    "file_name": file_path.name,
-                    "file_size": file_size,
-                    "content_type": self._get_content_type(file_path),
+                    "filesize": file_size,
+                    "filetype": file_type,
                 },
             )
             presign_response.raise_for_status()
             presign_data = presign_response.json()
             
-            # Step 2: Upload file to presigned URL
-            upload_url = presign_data.get("upload_url")
-            file_id = presign_data.get("file_id")
+            file_id = presign_data["data"]["FileId"]
+            upload_id = presign_data["data"]["UploadId"]
+            parts = presign_data["data"]["Parts"]
+            chunk_size = presign_data["data"].get("ChunkSize", 5 * 1024 * 1024)
             
-            with open(file_path, "rb") as f:
+            print(f"[Plaud] Got {len(parts)} part URLs, fileId={file_id}")
+            
+            # Step 2: Upload parts to S3
+            part_results = []
+            for i, part in enumerate(parts):
+                start = i * chunk_size
+                end = min(start + chunk_size, file_size)
+                chunk = file_data[start:end]
+                
+                print(f"[Plaud] Step 2: PUT part {part['PartNumber']}/{len(parts)} ({len(chunk)} bytes)")
+                
                 upload_response = await client.put(
-                    upload_url,
-                    content=f.read(),
-                    headers={"Content-Type": self._get_content_type(file_path)},
+                    part["PresignedUrl"],
+                    content=chunk,
                 )
                 upload_response.raise_for_status()
+                etag = upload_response.headers.get("ETag", "").strip('"')
+                part_results.append({
+                    "PartNumber": part["PartNumber"],
+                    "ETag": etag,
+                })
             
             # Step 3: Complete upload
+            print(f"[Plaud] Step 3: complete-upload ({len(part_results)} parts)")
+            
             complete_response = await client.post(
                 f"{self.base_url}/open/partner/files/upload/complete-upload",
-                headers={
-                    "X-Client-Id": self.client_id,
-                    "X-Client-Api-Key": self.api_key,
+                headers=auth_headers,
+                json={
+                    "file_id": file_id,
+                    "upload_id": upload_id,
+                    "part_list": part_results,
+                    "filetype": file_type,
+                    "file_md5": file_md5,
                 },
-                json={"file_id": file_id},
             )
             complete_response.raise_for_status()
             complete_data = complete_response.json()
-            file_url = complete_data.get("file_url")
+            download_url = complete_data["data"]["DownloadUrl"]
+            
+            print(f"[Plaud] Upload complete, got download URL")
             
             # Step 4: Submit transcription job
+            print(f"[Plaud] Step 4: Submit transcription task")
+            
             transcribe_response = await client.post(
                 f"{self.base_url}/open/partner/ai/transcriptions/",
-                headers={
-                    "X-Client-Id": self.client_id,
-                    "X-Client-Api-Key": self.api_key,
-                },
+                headers=auth_headers,
                 json={
-                    "file_url": file_url,
-                    "language": "auto",  # Auto-detect language
-                    "speaker_diarization": True,
+                    "file_url": download_url,
+                    "params": {
+                        "transcribe": {"language": "auto"},
+                        "diarization": {"enabled": True},
+                    },
                 },
             )
             transcribe_response.raise_for_status()
             job_data = transcribe_response.json()
-            task_id = job_data.get("task_id")
+            transcription_id = job_data.get("transcription_id") or job_data.get("data", {}).get("task_id", "")
+            
+            print(f"[Plaud] Transcription submitted: id={transcription_id}")
             
             # Step 5: Poll for completion
-            return await self._poll_transcription(client, task_id)
+            return await self._poll_transcription(client, transcription_id, auth_headers)
     
     async def _poll_transcription(
         self, 
         client: httpx.AsyncClient, 
-        task_id: str,
+        transcription_id: str,
+        auth_headers: dict,
     ) -> List[TranscriptSegment]:
         """Poll for transcription job completion."""
         max_attempts = 120  # 4 minutes max
         
-        for _ in range(max_attempts):
+        for attempt in range(max_attempts):
             await asyncio.sleep(2)
             
             response = await client.get(
-                f"{self.base_url}/open/partner/ai/transcriptions/{task_id}",
-                headers={
-                    "X-Client-Id": self.client_id,
-                    "X-Client-Api-Key": self.api_key,
-                },
+                f"{self.base_url}/open/partner/ai/transcriptions/{transcription_id}",
+                headers=auth_headers,
             )
             response.raise_for_status()
             
             data = response.json()
-            status = data.get("status")
+            status = data.get("status", "").upper()
             
-            if status == "completed":
+            print(f"[Plaud] Poll {attempt+1}/{max_attempts}: status={status}")
+            
+            if status == "SUCCESS":
                 return self._parse_transcript(data)
-            elif status == "failed":
-                error = data.get("error", "Unknown error")
+            elif status in ("FAILURE", "REVOKED"):
+                error = data.get("message", "Unknown error")
                 raise Exception(f"Transcription failed: {error}")
+            # PENDING, RECEIVED, STARTED, PROGRESS - keep polling
         
         raise TimeoutError("Transcription job timed out")
     
@@ -134,31 +170,17 @@ class PlaudClient:
         """Parse transcription response into segments."""
         segments = []
         
-        result = data.get("result", {})
-        utterances = result.get("utterances", [])
+        results = data.get("data", {}).get("results", [])
         
-        for u in utterances:
+        for r in results:
             segments.append(TranscriptSegment(
-                speaker_id=u.get("speaker"),
-                start=u.get("start", 0),
-                end=u.get("end", 0),
-                text=u.get("text", ""),
+                speaker_id=r.get("speaker_id"),
+                start=r.get("start", 0),
+                end=r.get("end", 0),
+                text=r.get("text", ""),
             ))
         
         return segments
-    
-    def _get_content_type(self, file_path: Path) -> str:
-        """Get content type for audio file."""
-        suffix = file_path.suffix.lower()
-        content_types = {
-            ".wav": "audio/wav",
-            ".mp3": "audio/mpeg",
-            ".m4a": "audio/mp4",
-            ".ogg": "audio/ogg",
-            ".flac": "audio/flac",
-            ".webm": "audio/webm",
-        }
-        return content_types.get(suffix, "application/octet-stream")
 
 
 # Singleton instance

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Plaud Transcription API
     plaud_client_id: str = ""
     plaud_api_key: str = ""
+    plaud_secret_key: str = ""  # For generating user tokens
     plaud_base_url: str = "https://platform-us.plaud.ai/developer/api"
     
     # Crusoe Inference API
@@ -19,12 +20,18 @@ class Settings(BaseSettings):
     crusoe_base_url: str = "https://api.inference.crusoecloud.com/v1"
     crusoe_model: str = "zai-org/GLM-5.3-Flash"
     
+    # Neo4j (optional, for future use)
+    neo4j_uri: str = ""
+    neo4j_username: str = ""
+    neo4j_password: str = ""
+    
     # App settings
     upload_dir: str = "./uploads"
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra env vars
 
 
 @lru_cache()

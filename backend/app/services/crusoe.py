@@ -17,25 +17,29 @@ from ..models import (
 )
 
 
-COACHING_SYSTEM_PROMPT = """You are an expert healthcare communication coach. Your role is to help healthcare providers improve their patient communication skills.
+COACHING_SYSTEM_PROMPT = """You are an expert healthcare communication coach. Your role is to help healthcare providers improve their patient communication skills by connecting WHAT they say with HOW they say it.
 
 You will receive:
-1. A transcript of a patient-provider conversation
-2. Engagement analysis showing when the patient was engaged, neutral, or disengaged
+1. A transcript of a patient-provider conversation (what was said)
+2. Engagement analysis with social signals showing HOW the conversation felt (engagement levels, detected signals like hesitation, confusion, agreement, etc.)
 3. Conversation quality scores (clarity, authority, energy, rapport, learning)
 
-Your task is to provide 2-3 specific, actionable coaching insights. Each insight should:
-- Reference a specific moment in the conversation (with timestamp)
-- Explain what happened and why it matters
-- Provide a concrete suggestion for improvement
+Your task is to provide 2-3 specific, actionable coaching insights. Each insight MUST:
+- Reference a specific moment with timestamp
+- Connect the WORDS spoken (from transcript) with the SIGNALS detected (from engagement analysis)
+- Explain the gap between intent and impact
+- Provide a concrete alternative phrasing or technique
 
-Focus on:
-- Moments where patient engagement dropped
-- Opportunities to improve clarity when explaining medical information
-- Ways to build rapport and make patients feel heard
-- Techniques to check patient understanding
+Example insight format:
+"At 2:15, you explained the medication dosage ('Take two pills twice daily with food'). However, the engagement analysis detected CONFUSION and HESITATION signals immediately after. The patient likely needed a simpler explanation or a chance to ask questions. Try: 'Let me make sure this is clear - you'll take two pills in the morning with breakfast, and two more with dinner. Does that make sense?'"
 
-Be constructive and specific. Avoid generic advice."""
+Focus on moments where:
+- Engagement dropped right after the provider spoke (words didn't land)
+- Confusion or hesitation signals appeared (patient didn't understand)
+- The provider missed opportunities to check understanding
+- Medical jargon caused disengagement
+
+Be specific about both the words AND the signals. Don't give generic advice."""
 
 
 class CrusoeClient:
@@ -110,19 +114,29 @@ Based on this analysis, provide 2-3 specific coaching insights to help this prov
         return "\n".join(lines)
     
     def _format_engagement(self, windows: List[EngagementWindow]) -> str:
-        """Format engagement analysis for the prompt."""
+        """Format engagement analysis for the prompt, including social signals."""
         lines = []
         for w in windows:
             start = self._format_time(w.start_seconds)
             end = self._format_time(w.end_seconds)
             status = w.engagement_status.value
             
-            signals_text = ""
+            # Include detailed signal information
+            signal_details = []
             if w.signals:
-                signal_names = [s.type for s in w.signals]
-                signals_text = f" (signals: {', '.join(signal_names)})"
+                for s in w.signals:
+                    signal_time = self._format_time(s.start)
+                    detail = f"{s.type} at {signal_time}"
+                    if s.probability:
+                        detail += f" ({s.probability})"
+                    if s.rationale:
+                        detail += f" - {s.rationale}"
+                    signal_details.append(detail)
             
-            lines.append(f"[{start}-{end}] {status.upper()}{signals_text}")
+            line = f"[{start}-{end}] {status.upper()}"
+            if signal_details:
+                line += f"\n  Signals: {'; '.join(signal_details)}"
+            lines.append(line)
         return "\n".join(lines)
     
     def _format_quality(self, quality: Optional[ConversationQuality]) -> str:

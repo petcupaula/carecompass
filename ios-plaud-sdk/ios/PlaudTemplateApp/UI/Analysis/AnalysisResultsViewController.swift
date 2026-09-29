@@ -368,6 +368,7 @@ final class EngagementTimelineCard: UIView {
     }()
     
     private let timelineStack = UIStackView()
+    private let signalsStack = UIStackView()
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -379,7 +380,7 @@ final class EngagementTimelineCard: UIView {
         backgroundColor = UIColor(hex: "#F8FAFC")
         layer.cornerRadius = 12
         
-        let stack = UIStackView(arrangedSubviews: [titleLabel, timelineStack])
+        let stack = UIStackView(arrangedSubviews: [titleLabel, timelineStack, signalsStack])
         stack.axis = .vertical
         stack.spacing = 16
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -388,6 +389,9 @@ final class EngagementTimelineCard: UIView {
         timelineStack.axis = .horizontal
         timelineStack.spacing = 2
         timelineStack.distribution = .fillEqually
+        
+        signalsStack.axis = .vertical
+        signalsStack.spacing = 8
         
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 16),
@@ -401,7 +405,9 @@ final class EngagementTimelineCard: UIView {
     
     func configure(with windows: [EngagementWindowResponse]) {
         timelineStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        signalsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
+        // Build timeline bars
         for window in windows {
             let bar = UIView()
             bar.layer.cornerRadius = 4
@@ -418,6 +424,35 @@ final class EngagementTimelineCard: UIView {
             }
             
             timelineStack.addArrangedSubview(bar)
+        }
+        
+        // Collect and display unique signals
+        var allSignals: [(String, String, Double)] = [] // (type, rationale, time)
+        for window in windows {
+            for signal in window.signals {
+                let rationale = signal.rationale ?? ""
+                allSignals.append((signal.type, rationale, signal.start))
+            }
+        }
+        
+        // Show up to 5 most interesting signals
+        let uniqueSignals = Array(Set(allSignals.map { "\($0.0): \($0.1)" })).prefix(5)
+        
+        if !uniqueSignals.isEmpty {
+            let signalsTitle = UILabel()
+            signalsTitle.text = "Detected Signals"
+            signalsTitle.font = .systemFont(ofSize: 14, weight: .medium)
+            signalsTitle.textColor = UIColor(hex: "#64748B")
+            signalsStack.addArrangedSubview(signalsTitle)
+            
+            for signalText in uniqueSignals {
+                let signalLabel = UILabel()
+                signalLabel.text = "• \(signalText)"
+                signalLabel.font = .systemFont(ofSize: 13)
+                signalLabel.textColor = UIColor(hex: "#475569")
+                signalLabel.numberOfLines = 0
+                signalsStack.addArrangedSubview(signalLabel)
+            }
         }
     }
 }

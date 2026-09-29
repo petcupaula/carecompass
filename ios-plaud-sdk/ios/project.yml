@@ -48,8 +48,8 @@ targets:
     info:
       path: PlaudTemplateApp/Info.plist
       properties:
-        CFBundleShortVersionString: "1.0.59"
-        CFBundleVersion: "59"
+        CFBundleShortVersionString: "1.0.61"
+        CFBundleVersion: "61"
         UILaunchScreen:
           UIColorName: "systemBackground"
         UserAccessToken: $(USER_ACCESS_TOKEN)
@@ -58,7 +58,10 @@ targets:
         PlaudApiKey: $(PLAUD_API_KEY)
         NSBluetoothAlwaysUsageDescription: Bluetooth is required to connect to your Plaud recording device.
         NSBluetoothPeripheralUsageDescription: Bluetooth is required to connect to your Plaud recording device.
-        NSLocalNetworkUsageDescription: Local network access is required for WiFi fast transfer.
+        NSLocalNetworkUsageDescription: CareCompass needs local network access to communicate with the analysis backend during development.
+        NSBonjourServices:
+          - _http._tcp
+          - _https._tcp
         NSLocationWhenInUseUsageDescription: Location access is required for WiFi fast transfer to identify and connect to your Plaud device hotspot.
         UIBackgroundModes:
           - bluetooth-central
