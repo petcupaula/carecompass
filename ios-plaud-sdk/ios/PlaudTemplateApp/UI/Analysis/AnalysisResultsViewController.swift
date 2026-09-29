@@ -52,7 +52,7 @@ final class AnalysisResultsViewController: UIViewController {
         btn.backgroundColor = UIColor(hex: "#EFF6FF")
         btn.layer.cornerRadius = 8
         btn.layer.borderWidth = 1
-        btn.layer.borderColor = UIColor(hex: "#2563EB")?.cgColor
+        btn.layer.borderColor = UIColor(hex: "#2563EB").cgColor
         btn.translatesAutoresizingMaskIntoConstraints = false
         btn.isHidden = true
         return btn
