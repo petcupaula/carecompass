@@ -16,6 +16,12 @@ CareCompass turns every patient conversation into measurable quality improvement
 **Center:** Recording detail with "Coaching Insights" action  
 **Right:** AI-generated coaching insights with conversation quality scores, engagement timeline, and detected social signals
 
+<p align="center">
+  <img src="docs/coaching-insights-detail.png" width="300" alt="Coaching Insights Detail" />
+</p>
+
+**Coaching Insights Detail:** Each insight connects what was said (transcript) with how it landed (social signals), providing specific alternative phrasings and techniques.
+
 ## Architecture
 
 ```
