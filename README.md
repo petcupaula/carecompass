@@ -35,8 +35,14 @@ CareCompass turns every patient conversation into measurable quality improvement
                         ▼                                ▼                                ▼
                ┌─────────────────┐             ┌─────────────────┐             ┌─────────────────┐
                │  Plaud API      │             │ Interhuman AI   │             │ Crusoe Inference│
-               │ (Transcription) │             │ (Social Signals)    │             │ (Coaching)      │
+               │ (Transcription) │             │ (Social Signals)│             │ (Coaching)      │
                └─────────────────┘             └─────────────────┘             └─────────────────┘
+                                                         │
+                                                         ▼
+                                               ┌─────────────────┐
+                                               │     Neo4j       │
+                                               │(Knowledge Graph)│
+                                               └─────────────────┘
 ```
 
 ## Why Interhuman AI?
