@@ -94,18 +94,52 @@ Based on this analysis, provide 2-3 specific coaching insights to help this prov
 - Why it matters: [explanation]
 - Suggested action: [concrete improvement]"""
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": COACHING_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.7,
-            max_tokens=2000,
-        )
-        
-        content = response.choices[0].message.content
-        return self._parse_insights(content)
+        try:
+            print(f"[Crusoe] Calling LLM model: {self.model}")
+            print(f"[Crusoe] Base URL: {self.client.base_url}")
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": COACHING_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.7,
+                max_tokens=8000,  # Increased for reasoning models
+            )
+            
+            # Handle reasoning models that put content in reasoning field
+            choice = response.choices[0] if response.choices else None
+            content = None
+            
+            if choice:
+                content = choice.message.content
+                # If content is empty but reasoning exists, extract insights from reasoning
+                if not content and hasattr(choice.message, 'reasoning') and choice.message.reasoning:
+                    print(f"[Crusoe] Using reasoning field as content (length: {len(choice.message.reasoning)})")
+                    content = choice.message.reasoning
+            
+            print(f"[Crusoe] LLM response received, length: {len(content) if content else 0}")
+            
+            if not content:
+                print(f"[Crusoe] WARNING: Empty content. Finish reason: {choice.finish_reason if choice else 'no choices'}")
+                return [CoachingInsight(
+                    title="Coaching Analysis",
+                    description="The AI model returned an empty response. This may be due to content filtering or model limitations.",
+                    specific_moment=None,
+                    suggested_action="Try regenerating insights or use a different recording.",
+                )]
+            
+            return self._parse_insights(content)
+        except Exception as e:
+            print(f"[Crusoe] ERROR calling LLM: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return [CoachingInsight(
+                title="Analysis Complete",
+                description=f"Coaching generation encountered an issue: {str(e)[:100]}",
+                specific_moment=None,
+                suggested_action="Please try regenerating insights or contact support.",
+            )]
     
     def _format_transcript(self, transcript: List[TranscriptSegment]) -> str:
         """Format transcript for the prompt."""
@@ -167,6 +201,8 @@ Based on this analysis, provide 2-3 specific coaching insights to help this prov
         if not content:
             return insights
         
+        print(f"[Crusoe] Raw LLM response:\n{content}\n---")
+        
         # Split by insight headers (marked with **)
         sections = content.split("**")
         
@@ -184,6 +220,7 @@ Based on this analysis, provide 2-3 specific coaching insights to help this prov
                 specific_moment = None
                 description = ""
                 suggested_action = ""
+                current_field = None
                 
                 lines = body.strip().split("\n")
                 
@@ -191,24 +228,54 @@ Based on this analysis, provide 2-3 specific coaching insights to help this prov
                     line = line.strip()
                     line_lower = line.lower()
                     
+                    # Check for field markers
                     if line_lower.startswith("- moment:") or line_lower.startswith("- specific moment:"):
                         specific_moment = line.split(":", 1)[1].strip() if ":" in line else ""
+                        current_field = "moment"
                     elif line_lower.startswith("- why") or line_lower.startswith("- explanation"):
                         description = line.split(":", 1)[1].strip() if ":" in line else ""
-                    elif line_lower.startswith("- action:") or line_lower.startswith("- suggested action:"):
+                        current_field = "description"
+                    elif line_lower.startswith("- action:") or line_lower.startswith("- suggested action:") or line_lower.startswith("- suggest"):
                         suggested_action = line.split(":", 1)[1].strip() if ":" in line else ""
+                        current_field = "action"
+                    elif line.startswith("-") and ":" in line:
+                        # Other bullet point with colon - might be a variant format
+                        key, val = line.split(":", 1)
+                        key_lower = key.lower()
+                        if "moment" in key_lower or "timestamp" in key_lower or "when" in key_lower:
+                            specific_moment = val.strip()
+                            current_field = "moment"
+                        elif "why" in key_lower or "matter" in key_lower or "impact" in key_lower:
+                            description = val.strip()
+                            current_field = "description"
+                        elif "action" in key_lower or "try" in key_lower or "instead" in key_lower or "suggest" in key_lower:
+                            suggested_action = val.strip()
+                            current_field = "action"
+                    elif line and current_field:
+                        # Continuation of previous field
+                        if current_field == "moment" and specific_moment:
+                            specific_moment += " " + line
+                        elif current_field == "description":
+                            description += " " + line if description else line
+                        elif current_field == "action":
+                            suggested_action += " " + line if suggested_action else line
                     elif not specific_moment and not description and not suggested_action:
                         # First non-empty line might be description
                         if line and not line.startswith("-"):
                             description = line
+                            current_field = "description"
                 
                 if title:
                     insights.append(CoachingInsight(
                         title=title,
-                        description=description or "See suggested action.",
+                        description=description or "See details below.",
                         specific_moment=specific_moment,
                         suggested_action=suggested_action or "Review this moment in the recording.",
                     ))
+                    print(f"[Crusoe] Parsed insight: {title}")
+                    print(f"  - moment: {specific_moment}")
+                    print(f"  - description: {description[:100] if description else 'none'}...")
+                    print(f"  - action: {suggested_action[:100] if suggested_action else 'none'}...")
             
             i += 2
         
